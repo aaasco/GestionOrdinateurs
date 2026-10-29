@@ -1,3 +1,4 @@
+
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using GestionOrdinateurs.Client;
@@ -7,8 +8,12 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
-// Permet de sauvegarder le token JWT dans le session du navigateur
+builder.Services.AddScoped(sp => new HttpClient
+{
+    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
+});
+
+// Permet de sauvegarder le token JWT dans la session du navigateur
 builder.Services.AddBlazoredSessionStorage();
 
 // Configure un client HTTP pour appeler l'API d'authentification

@@ -4,7 +4,6 @@ using GestionOrdinateurs.API.Services;
 using GestionOrdinateurs.API;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -39,26 +38,37 @@ builder.Services.AddDbContext<ParcInformatiqueContext>();
 builder.Services.AddScoped<StockService>();
 builder.Services.AddScoped<JournalService>();
 
-// Configuration de l'authentification JWT
+
+// Configuration de l'authentification JWT avec Keycloak
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // Récupère la configuration de Keycloak via le réseau Docker
+        options.MetadataAddress =
+            "http://keycloak:8080/realms/GestionOrdinateurs/.well-known/openid-configuration";
+
+        // Autorise HTTP pour notre environnement Docker local
+        options.RequireHttpsMetadata = false;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            // Aucun émetteur ni destinataire est défini
-            ValidateIssuer = false,
+            // Vérifie que le JWT provient bien de notre Realm Keycloak
+            ValidateIssuer = true,
+            ValidIssuer = "http://localhost:8180/realms/GestionOrdinateurs",
+
+            // Le JWT actuel contient "aud": "account"
+            // La validation de l'audience sera configurée séparément
             ValidateAudience = false,
 
-            // Vérifie que le token n'a pas expiré
+            // Vérifie la durée de validité et la signature du JWT
             ValidateLifetime = true,
-
-            // Vérifie la signature du token
             ValidateIssuerSigningKey = true,
 
-            // Utilise la même clé que l'API d'authentification
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"] ?? ""))
+            // Utilise notre mapper Keycloak pour récupérer les rôles
+            RoleClaimType = "roles"
         };
     });
+
 
 // Autorise les requêtes provenant du client Blazor
 builder.Services.AddCors(options =>

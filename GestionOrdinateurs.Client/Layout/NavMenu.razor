@@ -53,10 +53,10 @@
 
     private async Task Deconnecter()
     {
-        // Supprime le token JWT du session storage
+        // Supprime le JWT enregistré lors de la connexion
         await SessionStorage.RemoveItemAsync("token");
 
-        // Redirige vers la page de connexion
-        Navigation.NavigateTo("/");
+        // Redirige vers le formulaire de connexion
+        Navigation.NavigateTo("/login", forceLoad: true);
     }
 }

@@ -1,13 +1,8 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using GestionOrdinateurs.Shared;
+
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
 
 namespace AuthentificationApi.Controllers;
 
-// Controller permettant de générer un token JWT
 [ApiController]
 [Route("api/[controller]")]
 public class AuthenticationController : ControllerBase
@@ -15,37 +10,35 @@ public class AuthenticationController : ControllerBase
     private readonly IConfiguration configuration;
     private readonly IHttpClientFactory httpClientFactory;
 
-    // Injection de la configuration et de HttpClientFactory
-    public AuthenticationController(IConfiguration configuration, IHttpClientFactory httpClientFactory)
+    public AuthenticationController(
+        IConfiguration configuration,
+        IHttpClientFactory httpClientFactory)
     {
         this.configuration = configuration;
         this.httpClientFactory = httpClientFactory;
     }
 
-    // Génère un token JWT à partir du login
+    /*
+    // Ancienne méthode de connexion sans Keycloak
     [HttpPost("login")]
     public async Task<IActionResult> Login(string login)
     {
-
-        // Crée un client HTTP grâce à HttpClientFactory
         HttpClient client = httpClientFactory.CreateClient();
 
-        // Appelle l'API pour rechercher l'utilisateur par son login
-        HttpResponseMessage response = await client.GetAsync($"http://gestionordinateurs-api:5112/api/Users/{Uri.EscapeDataString(login)}");
+        // Recherche l'utilisateur dans l'API
+        HttpResponseMessage response = await client.GetAsync(
+            $"http://gestionordinateurs-api:5112/api/Users/{Uri.EscapeDataString(login)}");
 
-        // Vérifie si l'utilisateur existe
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             return NotFound("Cet utilisateur n'existe pas.");
         }
 
-        // Vérifie si l'appel à l'API a réussi
         if (!response.IsSuccessStatusCode)
         {
             return StatusCode(502, "Erreur lors de la recherche de l'utilisateur.");
         }
 
-        // Récupère les informations de l'utilisateur depuis la réponse de l'API
         User? utilisateur = await response.Content.ReadFromJsonAsync<User>();
 
         if (utilisateur == null)
@@ -53,30 +46,88 @@ public class AuthenticationController : ControllerBase
             return NotFound("Cet utilisateur n'existe pas.");
         }
 
-        // Récupère la clé JWT dans appsettings.json
         string jwtKey = configuration["Jwt:Key"] ?? "";
         byte[] key = Encoding.ASCII.GetBytes(jwtKey);
 
-        // Informations enregistrées dans le token
         Claim[] claims =
         {
             new Claim(ClaimTypes.Name, utilisateur.Login),
             new Claim(ClaimTypes.Role, utilisateur.Role.ToString())
         };
 
-        // Configuration du token JWT
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
             Expires = DateTime.UtcNow.AddMinutes(15),
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            SigningCredentials = new SigningCredentials(
+                new SymmetricSecurityKey(key),
+                SecurityAlgorithms.HmacSha256Signature)
         };
 
-        // Création et conversion du token en chaîne de caractères
         var tokenHandler = new JwtSecurityTokenHandler();
         var token = tokenHandler.CreateToken(tokenDescriptor);
         string jwt = tokenHandler.WriteToken(token);
 
         return Ok(jwt);
     }
+    */
+
+    // Nouvelle méthode de connexion avec Keycloak
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    {
+        string baseUrl = configuration["Keycloak:BaseUrl"] ?? "";
+        string realm = configuration["Keycloak:Realm"] ?? "";
+        string clientId = configuration["Keycloak:ClientId"] ?? "";
+        string clientSecret = configuration["Keycloak:ClientSecret"] ?? "";
+
+        if (string.IsNullOrWhiteSpace(clientSecret))
+        {
+            return StatusCode(500, "Client secret Keycloak non configuré.");
+        }
+
+        // Adresse du service Keycloak qui délivre les JWT
+        string url = $"{baseUrl}/realms/{realm}/protocol/openid-connect/token";
+
+        // Informations envoyées à Keycloak
+        var donnees = new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = clientId,
+            ["client_secret"] = clientSecret,
+            ["username"] = request.Username,
+            ["password"] = request.Password
+        };
+
+        HttpClient client = httpClientFactory.CreateClient();
+
+        // Demande du JWT à Keycloak
+        HttpResponseMessage response = await client.PostAsync(
+            url,
+            new FormUrlEncodedContent(donnees));
+
+        if (!response.IsSuccessStatusCode)
+        {
+            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest ||
+                response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                return Unauthorized(
+                    "Identifiant ou mot de passe incorrect, ou compte non configuré.");
+            }
+
+            return StatusCode(502, "Erreur de communication avec Keycloak.");
+        }
+
+        // Renvoie la réponse de Keycloak contenant le JWT
+        string resultat = await response.Content.ReadAsStringAsync();
+
+        return Content(resultat, "application/json");
+    }
+}
+
+// Données reçues depuis le formulaire de connexion
+public class LoginRequest
+{
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
 }

@@ -1,6 +1,10 @@
 
 @page "/login"
+
+@using System.Net.Http.Json
+@using System.Text.Json
 @using Blazored.SessionStorage
+
 @inject IHttpClientFactory HttpClientFactory
 @inject ISessionStorageService SessionStorage
 @inject NavigationManager Navigation
@@ -8,62 +12,77 @@
 <h3>Connexion</h3>
 
 <div class="mb-3">
-    <label>Login :</label>
-    <input class="form-control" @bind="login" />
+    <label>Identifiant</label>
+    <input class="form-control" @bind="username" />
+</div>
+
+<div class="mb-3">
+    <label>Mot de passe</label>
+    <input class="form-control" type="password" @bind="password" />
 </div>
 
 <button class="btn btn-primary" @onclick="SeConnecter">
     Se connecter
 </button>
 
-<p class="text-danger">@messageErreur</p>
+@if (!string.IsNullOrEmpty(messageErreur))
+{
+    <p class="text-danger">@messageErreur</p>
+}
 
 @code {
-    private string login = "";
+    private string username = "";
+    private string password = "";
     private string messageErreur = "";
 
-    // Vérifie le login et récupère le token JWT
     private async Task SeConnecter()
     {
         messageErreur = "";
 
-        // Vérifie que le login est renseigné
-        if (string.IsNullOrWhiteSpace(login))
+        try
         {
-            messageErreur = "Veuillez saisir un login.";
-            return;
+            HttpClient client =
+                HttpClientFactory.CreateClient("AuthentificationApi");
+
+            // Envoie les identifiants à notre API d'authentification
+            HttpResponseMessage response = await client.PostAsJsonAsync(
+                "api/Authentication/login",
+                new
+                {
+                    Username = username,
+                    Password = password
+                });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                messageErreur = "Identifiant ou mot de passe incorrect.";
+                return;
+            }
+
+            // Récupère le JWT renvoyé par Keycloak
+            using JsonDocument resultat =
+                await JsonDocument.ParseAsync(
+                    await response.Content.ReadAsStreamAsync());
+
+            string? token = resultat.RootElement
+                .GetProperty("access_token")
+                .GetString();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                messageErreur = "Aucun token reçu.";
+                return;
+            }
+
+            // Sauvegarde le JWT dans la session
+            await SessionStorage.SetItemAsync("token", token);
+
+            // Redirige vers l'accueil
+            Navigation.NavigateTo("/");
         }
-
-        // Crée un client HTTP pour appeler l'API d'authentification
-        HttpClient client = HttpClientFactory.CreateClient("AuthentificationApi");
-
-        // Demande un token JWT à partir du login
-        HttpResponseMessage response = await client.PostAsync(
-            $"api/Authentication/login?login={Uri.EscapeDataString(login)}",
-            null
-        );
-
-        // Vérifie si l'utilisateur existe
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (Exception)
         {
-            messageErreur = "Cet utilisateur n'existe pas.";
-            return;
+            messageErreur = "Erreur lors de la connexion au serveur.";
         }
-
-        // Vérifie si la connexion a réussi
-        if (!response.IsSuccessStatusCode)
-        {
-            messageErreur = "Une erreur est survenue lors de la connexion.";
-            return;
-        }
-
-        // Récupère le token JWT renvoyé par l'API
-        string token = await response.Content.ReadAsStringAsync();
-
-        // Enregistre le token dans la session du navigateur
-        await SessionStorage.SetItemAsync("token", token);
-
-        // Redirige vers la page d'accueil
-        Navigation.NavigateTo("/");
     }
 }
