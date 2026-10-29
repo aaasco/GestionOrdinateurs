@@ -14,7 +14,7 @@ builder.Services.AddBlazoredSessionStorage();
 // Configure un client HTTP pour appeler l'API d'authentification
 builder.Services.AddHttpClient("AuthentificationApi", client =>
 {
-    client.BaseAddress = new Uri("http://localhost:5295");
+    client.BaseAddress = new Uri("http://localhost:5157");
 });
 
 // Configure un client HTTP pour appeler l'API de gestion des ordinateurs

@@ -13,7 +13,7 @@ builder.Services.AddHttpClient();
 // Autorise les requêtes provenant du client Blazor
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowBlazorClient", policy =>
+    options.AddPolicy("BlazorClient", policy =>
     {
         policy.WithOrigins("http://localhost:5000")
               .AllowAnyHeader()
@@ -24,7 +24,7 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Active les CORS pour le client Blazor
-app.UseCors("AllowBlazorClient");
+app.UseCors("BlazorClient");
 
 // Activation de Swagger
 app.UseSwagger();

@@ -6,6 +6,16 @@ builder.Services.AddOpenApi();
 
 // Configure YARP avec les routes définies dans appsettings.json
 builder.Services.AddReverseProxy().LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+// Autorise les requêtes du client Blazor
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("BlazorClient", policy =>
+    {
+        policy.WithOrigins("http://localhost:5000")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
@@ -35,6 +45,9 @@ app.MapGet("/weatherforecast", () =>
     return forecast;
 })
 .WithName("GetWeatherForecast");
+
+// Active CORS pour le client Blazor
+app.UseCors("BlazorClient");
 
 // Active les routes de la passerelle
 app.MapReverseProxy();

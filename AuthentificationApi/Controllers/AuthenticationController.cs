@@ -31,7 +31,7 @@ public class AuthenticationController : ControllerBase
         HttpClient client = httpClientFactory.CreateClient();
 
         // Appelle l'API pour rechercher l'utilisateur par son login
-        HttpResponseMessage response = await client.GetAsync($"http://localhost:5112/api/Users/{Uri.EscapeDataString(login)}");
+        HttpResponseMessage response = await client.GetAsync($"http://gestionordinateurs-api:5112/api/Users/{Uri.EscapeDataString(login)}");
 
         // Vérifie si l'utilisateur existe
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
