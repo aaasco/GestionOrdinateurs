@@ -1,0 +1,103 @@
+﻿@page "/"
+@using GestionOrdinateurs.Shared
+@using Blazored.SessionStorage
+@using System.Net.Http.Headers
+@inject IHttpClientFactory HttpClientFactory
+@inject ISessionStorageService SessionStorage
+
+<PageTitle>Accueil</PageTitle>
+
+<h1>Liste des ordinateurs</h1>
+
+@if (ordinateurs == null)
+{
+    <p>Chargement des ordinateurs...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>État</th>
+                <th>Stock</th>
+                <th>Prix</th>
+                <th>Vendu</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (Ordinateur ordinateur in ordinateurs)
+            {
+                <tr>
+                    <td>@ordinateur.Nom</td>
+                    <td>@ordinateur.Etat</td>
+                    <td>@ordinateur.Stock</td>
+                    <td>@ordinateur.Prix €</td>
+                    <td>@(ordinateur.Vendu ? "Oui" : "Non")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<h2>Historique des réparations</h2>
+
+@if (historiqueReparations == null)
+{
+    <p>Chargement de l'historique...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID ordinateur</th>
+                <th>Nom ordinateur</th>
+                <th>Technicien</th>
+                <th>Type de réparation</th>
+                <th>Date d'intervention</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (HistoriqueReparationRecord reparation in historiqueReparations)
+            {
+                <tr>
+                    <td>@reparation.OrdinateurId</td>
+                    <td>@reparation.NomOrdinateur</td>
+                    <td>@reparation.Technicien</td>
+                    <td>@reparation.TypeReparation</td>
+                    <td>@reparation.DateIntervention.ToString("dd/MM/yyyy HH:mm")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Ordinateur>? ordinateurs;
+    private List<HistoriqueReparationRecord>? historiqueReparations;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Récupère le token JWT enregistré lors de la connexion
+        string? token = await SessionStorage.GetItemAsync<string>("token");
+
+        if (string.IsNullOrEmpty(token))
+        {
+            return;
+        }
+
+        // Crée le client HTTP pour appeler l'API
+        HttpClient client = HttpClientFactory.CreateClient("GestionOrdinateursApi");
+
+        // Ajoute le token JWT à la requête
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        // Récupère la liste des ordinateurs
+        ordinateurs = await client.GetFromJsonAsync<List<Ordinateur>>("api/Ordinateurs");
+        // Récupère l'historique des réparations
+        historiqueReparations = await client.GetFromJsonAsync<List<HistoriqueReparationRecord>>(
+    "api/Reparations/historique");
+    }
+}
